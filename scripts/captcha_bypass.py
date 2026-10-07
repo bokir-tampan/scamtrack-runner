@@ -40,7 +40,7 @@ def solve_recaptcha_v2_html(sitekey, pageurl=None, timeout=90):
     </body></html>"""
     token = None
     with Camoufox(headless=True, os="windows", humanize=True,
-                  locale=UA_HINT["locale"], timezone=UA_HINT["timezone"],
+                  locale=UA_HINT["locale"],
                   geoip=True, i_know_what_im_doing=True) as browser:
         page = browser.new_page()
         page.set_content(html)
@@ -89,7 +89,7 @@ def solve_turnstile(url, timeout=60):
     Camoufox = _camoufox()
     token = None
     with Camoufox(headless=True, os="windows", humanize=True,
-                  locale=UA_HINT["locale"], timezone=UA_HINT["timezone"],
+                  locale=UA_HINT["locale"],
                   geoip=True, i_know_what_im_doing=True) as browser:
         page = browser.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=60000)

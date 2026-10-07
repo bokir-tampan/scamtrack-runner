@@ -70,7 +70,7 @@ def generic():
         return {"error": "camoufox tidak tersedia"}
     from camoufox.sync_api import Camoufox
     with Camoufox(headless=True, os="windows", humanize=True,
-                  locale="id-ID", timezone="Asia/Jakarta", geoip=True,
+                  locale="id-ID", geoip=True,
                   i_know_what_im_doing=True, proxy=_cf_proxy()) as br:
         pg = br.new_page()
         pg.goto(url, wait_until="domcontentloaded", timeout=60000)
