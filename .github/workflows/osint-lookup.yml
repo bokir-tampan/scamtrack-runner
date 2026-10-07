@@ -65,10 +65,10 @@ jobs:
           IN_ARG3: ${{ github.event.inputs.arg3 }}
           IN_USE_PROXY: ${{ github.event.inputs.use_proxy }}
 
-      - name: Install browser (kpi/cekrekening butuh headless)
+      - name: Install browser + captcha bypass stack
         run: |
-          python -m pip install --quiet playwright requests
-          python -m playwright install --with-deps chromium
+          python -m pip install --quiet requests camoufox[geoip] faster-whisper playwright
+          python -m camoufox fetch
 
       - name: Run lookup
         env:

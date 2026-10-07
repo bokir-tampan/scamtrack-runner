@@ -6,8 +6,9 @@ Output: result.json  — selalu JSON.
 
 Provider:
   rfpdev      — rekening/ewallet/nik (gratis, tanpa key)  [tanpa captcha]
-  kpu         — DPT KPU (butuh token reCAPTCHA arg2)
+  kpu         — DPT KPU (token reCAPTCHA; auto-bypass kalau arg2 kosong)
   cekrekening — blacklist resmi Komdigi (Cloudflare Turnstile)
+  solvecaptcha— uji solver gratis: action=recaptcha|turnstile
   generic     — ambil URL (arg1) via browser, dump HTML/text
 
 Captcha:
@@ -60,24 +61,45 @@ def rfpdev():
 
 
 # ---------- generic browser ----------
+# ---------- generic browser (camoufox) ----------
 def generic():
-    from playwright.sync_api import sync_playwright
     url = A1
     wait = int(A3 or 8)
-    with sync_playwright() as p:
-        br = p.chromium.launch(headless=True, proxy=_pw_proxy())
-        pg = br.new_page(user_agent=UA)
+    b = _bypass()
+    if not b:
+        return {"error": "camoufox tidak tersedia"}
+    from camoufox.sync_api import Camoufox
+    with Camoufox(headless=True, os="windows", humanize=True,
+                  locale="id-ID", timezone="Asia/Jakarta", geoip=True,
+                  i_know_what_im_doing=True, proxy=_cf_proxy()) as br:
+        pg = br.new_page()
         pg.goto(url, wait_until="domcontentloaded", timeout=60000)
         pg.wait_for_timeout(wait * 1000)
         html = pg.content()
-        shot = "page.png"
-        pg.screenshot(path=shot, full_page=True)
+        pg.screenshot(path="page.png", full_page=True)
         turnstile = "challenges.cloudflare.com" in html or "turnstile" in html.lower()
         recaptcha = "recaptcha" in html.lower()
         body = pg.inner_text("body")[:5000]
-        br.close()
     return {"provider": "generic", "url": url, "turnstile": turnstile,
-            "recaptcha": recaptcha, "text": body, "screenshot": shot}
+            "recaptcha": recaptcha, "text": body, "screenshot": "page.png"}
+
+
+def solvecaptcha():
+    """Uji solver gratis: provider=solvecaptcha, action=recaptcha|turnstile, arg1=sitekey|url."""
+    b = _bypass()
+    if not b:
+        return {"error": "captcha_bypass tidak tersedia"}
+    if ACT == "turnstile":
+        return {"kind": "turnstile", **b.solve_turnstile(A1)}
+    return {"kind": "recaptcha", **b.solve_recaptcha_v2_html(A1 or KPU_SITEKEY, A2 or None)}
+
+
+def _cf_proxy():
+    p = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    if not p:
+        return None
+    u = up.urlparse(p)
+    return ("http", f"{u.hostname}:{u.port}", u.username, u.password)
 
 
 def _pw_proxy():
@@ -90,6 +112,15 @@ def _pw_proxy():
 
 
 # ---------- captcha solving ----------
+def _bypass():
+    try:
+        import captcha_bypass
+        return captcha_bypass
+    except Exception as e:
+        print("[bypass import err]", e)
+        return None
+
+
 def solve_turnstile(sitekey, pageurl):
     key = os.environ.get("CAPTCHA_KEY")
     prov = (os.environ.get("CAPTCHA_PROVIDER") or "").lower()
@@ -98,7 +129,13 @@ def solve_turnstile(sitekey, pageurl):
     nope = os.environ.get("NOPECHA_KEY")
     if nope:
         return _nopecha(nope, sitekey, pageurl)
-    return {"error": "no solver key (set CAPTCHA_KEY/NOPECHA_KEY)"}
+    # gratis: browser stealth
+    b = _bypass()
+    if b:
+        if "recaptcha" in pageurl:
+            return b.solve_recaptcha_v2_html(sitekey, pageurl)
+        return b.solve_turnstile(pageurl)
+    return {"error": "no solver key & bypass module tak ada"}
 
 
 def _api_captcha(prov, key, sitekey, pageurl):
@@ -164,19 +201,31 @@ def cekrekening():
 
 
 # ---------- KPU DPT ----------
+KPU_SITEKEY = "6Lcs6gYaAAAAAFgluYoQBea_lCpiT9MkKH-jzhDH"
+
+
 def kpu():
-    """KPU butuh reCAPTCHA v2 token (arg2). Kalau tak ada token -> error jelas."""
-    if not A2:
-        return {"provider": "kpu", "error": "butuh token reCAPTCHA di arg2 (atau solver)"}
+    """KPU butuh token reCAPTCHA v2. arg2 = token; kalau kosong → bypass gratis."""
+    token = A2
+    solved = None
+    if not token:
+        b = _bypass()
+        if b:
+            solved = b.solve_recaptcha_v2_html(KPU_SITEKEY, "https://cekdptonline.kpu.go.id/")
+            token = solved.get("token")
+    if not token:
+        return {"provider": "kpu", "error": "token reCAPTCHA gagal didapat",
+                "solver": solved}
     r = requests_()
     q = {"query": "query findNikSidalih($wilayah_id:Int!,$nik:String!,$token:String!){"
                   "findNikSidalih(wilayah_id:$wilayah_id,nik:$nik,token:$token)"
                   "{nama nkk provinsi kabupaten kecamatan kelurahan jenis_kelamin}}",
-         "variables": {"nik": A1, "wilayah_id": int(A1[:2]) if A1[:2].isdigit() else 0, "token": A2}}
+         "variables": {"nik": A1, "wilayah_id": int(A1[:2]) if A1[:2].isdigit() else 0, "token": token}}
     rr = r.post("https://cekdptonline.kpu.go.id/v2", json=q,
                 headers={"User-Agent": UA, "Content-Type": "application/json"},
                 timeout=30, proxies=proxies())
-    return {"provider": "kpu", "code": rr.status_code, "json": _j(rr)}
+    return {"provider": "kpu", "solver": ("bypass" if solved else "operator_token"),
+            "code": rr.status_code, "json": _j(rr)}
 
 
 def _j(rr):
@@ -194,6 +243,8 @@ def main():
             res = cekrekening()
         elif PROV == "kpu":
             res = kpu()
+        elif PROV == "solvecaptcha":
+            res = solvecaptcha()
         else:
             res = generic()
     except Exception as e:
