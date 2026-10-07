@@ -40,7 +40,11 @@ def solve_recaptcha_on_page(pageurl, timeout=150):
     with Camoufox(headless=True, os="windows", humanize=True,
                   locale="id-ID", geoip=True, i_know_what_im_doing=True) as browser:
         page = browser.new_page()
-        page.goto(pageurl, wait_until="domcontentloaded", timeout=60000)
+        try:
+            page.goto(pageurl, wait_until="commit", timeout=90000)
+        except Exception as e:
+            notes.append("goto:"+str(e)[:60])
+        page.wait_for_timeout(5000)
         page.wait_for_timeout(3000)
         anchor = page.frame_locator("iframe[src*='api2/anchor']")
         try:
@@ -84,7 +88,11 @@ def solve_turnstile_on_page(pageurl, timeout=90):
     with Camoufox(headless=True, os="windows", humanize=True,
                   locale="id-ID", geoip=True, i_know_what_im_doing=True) as browser:
         page = browser.new_page()
-        page.goto(pageurl, wait_until="domcontentloaded", timeout=60000)
+        try:
+            page.goto(pageurl, wait_until="commit", timeout=90000)
+        except Exception as e:
+            notes.append("goto:"+str(e)[:60])
+        page.wait_for_timeout(5000)
         deadline = time.time() + timeout
         while time.time() < deadline:
             tok = page.evaluate(
