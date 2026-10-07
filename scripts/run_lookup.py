@@ -85,13 +85,14 @@ def generic():
 
 
 def solvecaptcha():
-    """Uji solver gratis: provider=solvecaptcha, action=recaptcha|turnstile, arg1=sitekey|url."""
+    """Uji solver gratis: provider=solvecaptcha, action=recaptcha|turnstile, arg1=URL halaman."""
     b = _bypass()
     if not b:
         return {"error": "captcha_bypass tidak tersedia"}
+    url = A1 or "https://cekdptonline.kpu.go.id/"
     if ACT == "turnstile":
-        return {"kind": "turnstile", **b.solve_turnstile(A1)}
-    return {"kind": "recaptcha", **b.solve_recaptcha_v2_html(A1 or KPU_SITEKEY, A2 or None)}
+        return {"kind": "turnstile", **b.solve_turnstile_on_page(url)}
+    return {"kind": "recaptcha", **b.solve_recaptcha_on_page(url)}
 
 
 def _cf_proxy():
@@ -129,12 +130,12 @@ def solve_turnstile(sitekey, pageurl):
     nope = os.environ.get("NOPECHA_KEY")
     if nope:
         return _nopecha(nope, sitekey, pageurl)
-    # gratis: browser stealth
+    # gratis: browser stealth di halaman asli
     b = _bypass()
     if b:
         if "recaptcha" in pageurl:
-            return b.solve_recaptcha_v2_html(sitekey, pageurl)
-        return b.solve_turnstile(pageurl)
+            return b.solve_recaptcha_on_page(pageurl)
+        return b.solve_turnstile_on_page(pageurl)
     return {"error": "no solver key & bypass module tak ada"}
 
 
@@ -211,7 +212,7 @@ def kpu():
     if not token:
         b = _bypass()
         if b:
-            solved = b.solve_recaptcha_v2_html(KPU_SITEKEY, "https://cekdptonline.kpu.go.id/")
+            solved = b.solve_recaptcha_on_page("https://cekdptonline.kpu.go.id/")
             token = solved.get("token")
     if not token:
         return {"provider": "kpu", "error": "token reCAPTCHA gagal didapat",
