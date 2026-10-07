@@ -21,11 +21,17 @@ def _camoufox():
 
 
 def _transcribe(mp3_bytes):
+    import tempfile, os
     from faster_whisper import WhisperModel
-    model = WhisperModel("tiny", device="cpu", compute_type="int8")
-    segs, _ = model.transcribe(io.BytesIO(mp3_bytes), language="en")
-    txt = " ".join(s.text for s in segs).strip()
-    return re.sub(r"[^a-z0-9 ]", "", txt.lower())
+    f = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+    f.write(mp3_bytes); f.close()
+    try:
+        model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        segs, _ = model.transcribe(f.name, language="en")
+        txt = " ".join(s.text for s in segs).strip()
+        return re.sub(r"[^a-z0-9 ]", "", txt.lower())
+    finally:
+        os.unlink(f.name)
 
 
 def _token(page):
