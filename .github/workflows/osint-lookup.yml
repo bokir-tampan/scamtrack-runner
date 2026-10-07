@@ -67,7 +67,8 @@ jobs:
 
       - name: Install browser + captcha bypass stack
         run: |
-          python -m pip install --quiet requests camoufox[geoip] faster-whisper playwright
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          python -m pip install --quiet requests camoufox[geoip] SpeechRecognition faster-whisper playwright
           python -m camoufox fetch
 
       - name: Run lookup

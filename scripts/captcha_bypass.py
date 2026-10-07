@@ -21,17 +21,33 @@ def _camoufox():
 
 
 def _transcribe(mp3_bytes):
-    import tempfile, os
-    from faster_whisper import WhisperModel
+    """Transkripsi audio captcha. SpeechRecognition/Google (gratis) → fallback whisper."""
+    import tempfile, os, subprocess
     f = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
     f.write(mp3_bytes); f.close()
+    wav = f.name + ".wav"
     try:
+        subprocess.run(["ffmpeg", "-y", "-i", f.name, "-ar", "16000", "-ac", "1", wav],
+                       capture_output=True, timeout=60)
+        try:
+            import speech_recognition as sr
+            r = sr.Recognizer()
+            with sr.AudioFile(wav) as src:
+                audio = r.record(src)
+            return re.sub(r"[^a-z0-9 ]", "", r.recognize_google(audio).lower())
+        except Exception as e:
+            print("[sr fail]", e)
+        # fallback: faster-whisper
+        from faster_whisper import WhisperModel
         model = WhisperModel("tiny", device="cpu", compute_type="int8")
-        segs, _ = model.transcribe(f.name, language="en")
-        txt = " ".join(s.text for s in segs).strip()
-        return re.sub(r"[^a-z0-9 ]", "", txt.lower())
+        segs, _ = model.transcribe(wav, language="en")
+        return re.sub(r"[^a-z0-9 ]", "", " ".join(s.text for s in segs).strip().lower())
     finally:
-        os.unlink(f.name)
+        for p in (f.name, wav):
+            try:
+                os.unlink(p)
+            except Exception:
+                pass
 
 
 def _token(page):
