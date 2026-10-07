@@ -1,0 +1,96 @@
+name: osint-lookup
+
+# OSINT lookup runner — jalur yang butuh captcha / IP asing / browser.
+# Dipicu dari scamtrack via API (repo_dispatch / workflow_dispatch).
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "rfpdev | kpu | cekrekening | generic"
+        required: true
+        default: "rfpdev"
+      action:
+        description: "rekening | ewallet | nik | dpt | check | get"
+        required: true
+        default: "ewallet"
+      arg1:
+        description: "bank_code | nik | nomor | url"
+        required: false
+        default: ""
+      arg2:
+        description: "nomor rekening | token captcha | account_number"
+        required: false
+        default: ""
+      arg3:
+        description: "reserved"
+        required: false
+        default: ""
+      use_proxy:
+        description: "route via HTTP_PROXY secret (IP Indonesia)"
+        required: false
+        default: "false"
+  repository_dispatch:
+    types: [osint-lookup]
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve inputs
+        id: inp
+        run: |
+          python - <<'PY'
+          import os, json
+          if os.environ.get("GITHUB_EVENT_NAME") == "repository_dispatch":
+              c = json.loads(os.environ["GITHUB_EVENT_PATH"])
+              p = c.get("client_payload", {})
+          else:
+              p = {k: os.environ.get("IN_"+k.upper(), "") for k in ("provider","action","arg1","arg2","arg3","use_proxy")}
+              p["use_proxy"] = os.environ.get("IN_USE_PROXY", "false")
+          open("/tmp/inp.json","w").write(json.dumps(p))
+          print(json.dumps(p))
+          PY
+        env:
+          IN_PROVIDER: ${{ github.event.inputs.provider }}
+          IN_ACTION: ${{ github.event.inputs.action }}
+          IN_ARG1: ${{ github.event.inputs.arg1 }}
+          IN_ARG2: ${{ github.event.inputs.arg2 }}
+          IN_ARG3: ${{ github.event.inputs.arg3 }}
+          IN_USE_PROXY: ${{ github.event.inputs.use_proxy }}
+
+      - name: Install browser (kpi/cekrekening butuh headless)
+        run: |
+          python -m pip install --quiet playwright requests
+          python -m playwright install --with-deps chromium
+
+      - name: Run lookup
+        env:
+          HTTP_PROXY: ${{ secrets.HTTP_PROXY }}
+          HTTPS_PROXY: ${{ secrets.HTTP_PROXY }}
+          CAPTCHA_KEY: ${{ secrets.CAPTCHA_KEY }}          # 2captcha/anticaptcha API key
+          CAPTCHA_PROVIDER: ${{ secrets.CAPTCHA_PROVIDER }} # 2captcha | anticaptcha
+          NOPECHA_KEY: ${{ secrets.NOPECHA_KEY }}
+          SESSION_JSON: ${{ secrets.SESSION_JSON }}          # optional userbot session
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT }}
+        run: |
+          ARGS=""
+          python - <<'PY'
+          import json
+          p=json.load(open("/tmp/inp.json"))
+          print("provider=",p.get("provider"),"action=",p.get("action"))
+          PY
+          python scripts/run_lookup.py
+
+      - name: Publish result
+        uses: actions/upload-artifact@v4
+        with:
+          name: osint-result
+          path: result.json
