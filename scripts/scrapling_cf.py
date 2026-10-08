@@ -40,7 +40,9 @@ def wait_otp(s, addr, timeout=150):
             if e.get("id") is not None:
                 ed = s.get(f"{NAYTRA_BASE}/api/email/{e['id']}", timeout=40).json()
                 blob += " " + (ed.get("body") or "") + " " + (ed.get("body_html") or "")
-            m = re.search(r'(?<!\d)(\d{6})(?!\d)', blob)
+            m = (re.search(r'(?i)OTP[^0-9]{0,40}(\d{6})', blob)
+                 or re.search(r'(?i)code[^0-9]{0,40}(\d{6})', blob)
+                 or re.search(r'(?<!\d)(\d{6})(?!\d)', blob))
             if m:
                 return m.group(1)
         time.sleep(5)
@@ -83,15 +85,45 @@ def main():
             res = page.evaluate(INPAGE_POST, {"o": f"{BASE}/register/otp",
                                               "body": {"_token": tok, "otp": otp}})
             print("otp post:", res, flush=True)
-            page.goto(f"{BASE}/dashboard")
+            page.goto(f"{BASE}/login")
             return page
         p2 = sess.fetch(f"{BASE}/register/otp", page_action=do_otp, network_idle=True)
         print("after otp url:", getattr(p2, "url", "?"), flush=True)
         out["after_otp_url"] = getattr(p2, "url", "")
 
+        # 2b) LOGIN (email + password) sampai masuk dashboard
+        def do_login(page):
+            if "/login" not in page.url:
+                page.goto(f"{BASE}/login")
+            page.wait_for_selector('input[name="email"]', timeout=60000)
+            page.fill('input[name="email"]', email)
+            page.fill('input[name="password"]', PW)
+            page.click('button[type="submit"], form button')
+            try:
+                page.wait_for_load_state("networkidle", timeout=45000)
+            except Exception:
+                pass
+            return page
+        p2b = sess.fetch(f"{BASE}/login", page_action=do_login, network_idle=True)
+        print("after login url:", getattr(p2b, "url", "?"), flush=True)
+        out["after_login_url"] = getattr(p2b, "url", "")
+
         # 3) credentials + rotate via in-page fetch
         def do_creds(page):
-            tok = page.eval_on_selector('meta[name="csrf-token"]', "e=>e.content")
+            if "/profile/credentials" not in page.url:
+                page.goto(f"{BASE}/profile/credentials")
+            try:
+                page.wait_for_selector('form[action*="credentials/rotate"]', timeout=60000)
+            except Exception:
+                pass
+            try:
+                tok = page.eval_on_selector('meta[name="csrf-token"]', "e=>e.content")
+            except Exception:
+                try:
+                    tok = page.eval_on_selector('input[name="_token"]', "e=>e.value")
+                except Exception:
+                    tok = ""
+            print("creds url:", page.url, "token?", bool(tok), flush=True)
             res = page.evaluate(INPAGE_POST, {"o": f"{BASE}/profile/credentials/rotate",
                                               "body": {"_token": tok}})
             print("rotate post:", res, flush=True)
