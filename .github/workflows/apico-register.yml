@@ -1,0 +1,29 @@
+name: apico-register
+
+# Register api.co.id PROD (Cloudflare) via camoufox + NayTra OTP -> ambil API key.
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - "scripts/apico_register.py"
+
+jobs:
+  reg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install browser stack
+        run: |
+          python -m pip install --quiet requests camoufox[geoip]
+          python -m camoufox fetch
+      - name: Run
+        run: python scripts/apico_register.py
+      - name: Publish result
+        uses: actions/upload-artifact@v4
+        with:
+          name: apico-result
+          path: result.json
