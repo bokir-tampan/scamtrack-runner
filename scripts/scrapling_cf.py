@@ -148,6 +148,21 @@ def main():
         out["candidates"] = cands
         print("candidates:", cands[:8], flush=True)
 
+        # 3b) dump info produk + saldo untuk tahu jalur gratis
+        def dump_info(page):
+            return page
+        for _p, _name in [(f"{BASE}/products", "products"), (f"{BASE}/profile/balance", "balance"),
+                          (f"{BASE}/dashboard/subscriptions", "subs")]:
+            try:
+                _pg = sess.fetch(_p, page_action=dump_info, network_idle=True)
+                _h = getattr(_pg, "html_content", "") or ""
+                import re as _re
+                _t = _re.sub(r'\s+', ' ', _re.sub(r'<[^>]+>', ' ', _h))
+                out[_name] = _t[:1500]
+                print(f"[{_name}]", _t[:400], flush=True)
+            except Exception as _e:
+                print(f"[{_name}] err", _e, flush=True)
+
         # 4) verify
         for k in cands:
             try:
