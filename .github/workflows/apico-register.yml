@@ -26,4 +26,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: apico-result
-          path: result.json
+          path: |
+            result.json
+            cf_debug.png
+            cf_debug.html

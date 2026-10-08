@@ -59,20 +59,24 @@ def main():
     print("mail:", email, flush=True)
 
     from camoufox.sync_api import Camoufox
-    with Camoufox(headless=True) as browser:
+    opts = dict(headless="virtual", humanize=True, geoip=True,
+                os=["windows"], locale="en-US")
+    with Camoufox(**opts) as browser:
         page = browser.new_page()
-        page.goto(f"{BASE}/register", wait_until="commit", timeout=90000)
-        # tunggu CF clear
-        for _ in range(30):
+        page.goto(f"{BASE}/register", wait_until="domcontentloaded", timeout=90000)
+        # tunggu CF clear + form muncul
+        try:
+            page.wait_for_selector('input[name="email"]', timeout=90000)
+            print("register form appeared", flush=True)
+        except Exception as e:
+            print("form wait:", e, "url:", page.url, "title:", page.title(), flush=True)
             try:
-                if page.query_selector('input[name="email"]'):
-                    break
+                page.screenshot(path="cf_debug.png")
+                open("cf_debug.html", "w").write(page.content())
             except Exception:
                 pass
-            time.sleep(2)
         html = page.content()
-        tok = page.eval_on_selector('input[name="_token"]', "e=>e.value") if page.query_selector('input[name="_token"]') else meta_token(html)
-        print("register page loaded, token?", bool(tok), flush=True)
+        tok = meta_token(html)
         page.fill('input[name="email"]', email)
         page.fill('input[name="password"]', PW)
         page.fill('input[name="password_confirmation"]', PW)
