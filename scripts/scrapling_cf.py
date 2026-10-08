@@ -31,6 +31,20 @@ def naytra():
     return s, addr
 
 
+def _extract_code(blob):
+    t = re.sub(r'<[^>]+>', ' ', blob or '')
+    t = re.sub(r'\s+', ' ', t)
+    for pat in [r'(?i)registration[^0-9]{0,30}(\d{4,8})',
+                r'(?i)verification[^0-9]{0,30}(\d{4,8})',
+                r'(?i)\botp\b[^0-9]{0,15}[:：]?\s*(\d{4,8})',
+                r'(?i)\bcode\b[^0-9]{0,15}[:：]?\s*(\d{4,8})']:
+        m = re.search(pat, t)
+        if m:
+            return m.group(1)
+    m = re.search(r'(?<!\d)(\d{6})(?!\d)', t)
+    return m.group(1) if m else None
+
+
 def wait_otp(s, addr, timeout=150):
     t0 = time.time()
     while time.time() - t0 < timeout:
@@ -39,12 +53,10 @@ def wait_otp(s, addr, timeout=150):
             blob = e.get("subject", "") or ""
             if e.get("id") is not None:
                 ed = s.get(f"{NAYTRA_BASE}/api/email/{e['id']}", timeout=40).json()
-                blob += " " + (ed.get("body") or "") + " " + (ed.get("body_html") or "")
-            m = (re.search(r'(?i)OTP[^0-9]{0,40}(\d{6})', blob)
-                 or re.search(r'(?i)code[^0-9]{0,40}(\d{6})', blob)
-                 or re.search(r'(?<!\d)(\d{6})(?!\d)', blob))
-            if m:
-                return m.group(1)
+                blob += " " + (ed.get("body_text") or "") + " " + (ed.get("body_html") or "") + " " + (ed.get("body") or "")
+            code = _extract_code(blob)
+            if code:
+                return code
         time.sleep(5)
     return None
 
@@ -96,13 +108,14 @@ def main():
             if "/login" not in page.url:
                 page.goto(f"{BASE}/login")
             page.wait_for_selector('input[name="email"]', timeout=60000)
-            page.fill('input[name="email"]', email)
-            page.fill('input[name="password"]', PW)
-            page.click('button[type="submit"], form button')
             try:
-                page.wait_for_load_state("networkidle", timeout=45000)
+                tok = page.eval_on_selector('input[name="_token"]', "e=>e.value")
             except Exception:
-                pass
+                tok = ""
+            res = page.evaluate(INPAGE_POST, {"o": f"{BASE}/login",
+                                              "body": {"_token": tok, "email": email, "password": PW}})
+            print("login post:", res, flush=True)
+            page.goto(f"{BASE}/profile/credentials")
             return page
         p2b = sess.fetch(f"{BASE}/login", page_action=do_login, network_idle=True)
         print("after login url:", getattr(p2b, "url", "?"), flush=True)
