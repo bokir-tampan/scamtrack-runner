@@ -47,7 +47,6 @@ def rfpdev():
     r = requests_()
     base = "https://rfpdev.me"
     if ACT in ("rekening", "bank"):
-        body = {"account_number": A2 or A1, "bank_code": A1 if A2 else A1}
         body = {"account_number": A2, "bank_code": A1}
         u, b = base + "/api/check-rekening", body
     elif ACT in ("ewallet", "wallet"):

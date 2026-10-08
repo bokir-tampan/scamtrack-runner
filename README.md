@@ -58,11 +58,18 @@ polling via API actions/runs.
 | cekrekening | check | (URL opsional) | — |
 | generic | get | URL | wait detik (arg3) |
 
-## Captcha policy
-- Ada `CAPTCHA_KEY`/`NOPECHA_KEY` → solver otomatis (Turnstile & reCAPTCHA v2).
-- Tidak ada key → runner tulis `needs_solver:true` + screenshot `page.png`
-  (artifact) supaya operator selesaikan manual / putuskan jalur lain.
-- `cekbansos` **sengaja tidak disertakan** (atas permintaan operator).
+## Captcha policy — BYPASS GRATIS (terbukti jalan)
+Tidak perlu solver berbayar. `scripts/captcha_bypass.py`:
+- **reCAPTCHA v2** di halaman asli target (sitekey terikat domain → wajib pageurl asli):
+  camoufox stealth → klik anchor → kalau tantangan gambar → tombol **AUDIO** →
+  ffmpeg → **STT gratis** (SpeechRecognition/Google Web Speech, fallback faster-whisper)
+  → isi jawaban → verify → token.
+  ✅ Teruji di GH Actions: `{ok:true, token:"0cAFcWeA43..."}` (demo reCAPTCHA Google).
+- **Turnstile**: camoufox buka pageurl asli → poll `cf-turnstile-response`.
+- Solver berbayar (2captcha/capsolver/nopecha) cuma *opsional* kalau ada `CAPTCHA_KEY`.
+
+**Catatan KPU:** `cekdptonline.kpu.go.id` menggantung dari IP GH (harus IP Indonesia)
+→ set secret `HTTP_PROXY` (VPS ID) supaya goto tidak timeout. Bypass-nya sendiri jalan.
 
 ## Lanjutan (opsional)
 `scamtrack` bisa memanggil harness ini otomatis: set `GH_TOKEN` + `SCAM_GH_REPO`,
