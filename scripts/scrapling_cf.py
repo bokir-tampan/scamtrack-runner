@@ -157,9 +157,10 @@ def main():
                 _pg = sess.fetch(_p, page_action=dump_info, network_idle=True)
                 _h = getattr(_pg, "html_content", "") or ""
                 import re as _re
+                _h = _re.sub(r'(?is)<(script|style)[^>]*>.*?</\1>', ' ', _h)
                 _t = _re.sub(r'\s+', ' ', _re.sub(r'<[^>]+>', ' ', _h))
                 out[_name] = _t[:1500]
-                print(f"[{_name}]", _t[:400], flush=True)
+                print(f"[{_name}]", _t[:700], flush=True)
             except Exception as _e:
                 print(f"[{_name}] err", _e, flush=True)
 
