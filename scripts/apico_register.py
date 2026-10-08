@@ -59,7 +59,7 @@ def main():
     print("mail:", email, flush=True)
 
     from camoufox.sync_api import Camoufox
-    opts = dict(headless="virtual", humanize=True, geoip=True,
+    opts = dict(headless=False, humanize=True, geoip=True,
                 os=["windows"], locale="en-US")
     with Camoufox(**opts) as browser:
         page = browser.new_page()
